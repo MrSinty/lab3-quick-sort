@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# User dependencies
+lab3/pyperf_itest.json
+lab3/pyperf_qtest.json
+lab3/benchmarks.png

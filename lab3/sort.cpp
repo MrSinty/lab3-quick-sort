@@ -73,7 +73,7 @@ int main(int argc, char* argv)
 {
     srand(time(0));
 
-    const int N = 10000;
+    const int N = 1000;
 
     int a[N];
     int b[N];
@@ -109,9 +109,9 @@ int main(int argc, char* argv)
             })
         .render(ankerl::nanobench::templates::pyperf(), fout2);
 
-    // Вывод отсортированного массива
+     //Вывод отсортированного массива
     //for (int i = 0; i < 100; ++i) {
-    //    std::cout << a[i] << " ";
+    //    std::cout << b[i] << " ";
     //}
     return 0;
 }
