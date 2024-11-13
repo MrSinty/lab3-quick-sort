@@ -7,7 +7,14 @@
 #define ANKERL_NANOBENCH_IMPLEMENT
 #include "nanobench.h"
 
-// Функция для сортировки вставками
+template <typename T>
+void swap(T& a, T& b)
+{
+    T temp = std::move(a);
+    a = std::move(b);
+    b = std::move(temp);
+}
+
 template <typename T, typename Compare>
 void insertionSort(T* first, T* last, Compare comp) {
     for (T* i = first + 1; i < last; ++i) {
@@ -21,40 +28,68 @@ void insertionSort(T* first, T* last, Compare comp) {
     }
 }
 
-// Функция для выбора опорного элемента (медиана из первого, среднего и последнего элементов)
 template <typename T, typename Compare>
 T* medianOfThree(T* first, T* middle, T* last, Compare comp) {
-    if (comp(*middle, *first)) std::swap(*middle, *first);
-    if (comp(*last, *first)) std::swap(*last, *first);
-    if (comp(*last, *middle)) std::swap(*last, *middle);
+    if (comp(*middle, *first)) swap(*middle, *first);
+    if (comp(*last, *first)) swap(*last, *first);
+    if (comp(*last, *middle)) swap(*last, *middle);
     return middle;
 }
 
-// Основная функция быстрой сортировки с оптимизациями
 template <typename T, typename Compare>
-void sort(T* first, T* last, Compare comp) {
-    const int INSERTION_SORT_THRESHOLD = 10; // Экспериментальное значение для вставки
+void quickSort(T* first, T* last, Compare comp) {
 
-    while (std::distance(first, last) > INSERTION_SORT_THRESHOLD) {
+    while (std::distance(first, last) > 0) {
         T* middle = first + (last - first) / 2;
         T* pivot = medianOfThree(first, middle, last - 1, comp);
 
-        std::swap(*pivot, *(last - 1)); // Перемещение опорного элемента в конец
+        swap(*pivot, *(last - 1));
 
-        // Разбиение массива
         T* left = first;
         T* right = last - 2;
         while (true) {
             while (comp(*left, *(last - 1))) ++left;
             while (comp(*(last - 1), *right)) --right;
             if (left >= right) break;
-            std::swap(*left, *right);
+            swap(*left, *right);
             ++left;
             --right;
         }
-        std::swap(*left, *(last - 1)); // Возвращение опорного элемента на место
+        swap(*left, *(last - 1));
 
-        // Рекурсивная сортировка меньшего интервала
+        if (std::distance(first, left) < std::distance(left + 1, last)) {
+            quickSort(first, left, comp);
+            first = left + 1;
+        }
+        else {
+            quickSort(left + 1, last, comp);
+            last = left;
+        }
+    }
+}
+
+template <typename T, typename Compare>
+void sort(T* first, T* last, Compare comp, int threshold) {
+    const int INSERTION_SORT_THRESHOLD = threshold;
+
+    while (std::distance(first, last) > INSERTION_SORT_THRESHOLD) {
+        T* middle = first + (last - first) / 2;
+        T* pivot = medianOfThree(first, middle, last - 1, comp);
+
+        swap(*pivot, *(last - 1));
+
+        T* left = first;
+        T* right = last - 2;
+        while (true) {
+            while (comp(*left, *(last - 1))) ++left;
+            while (comp(*(last - 1), *right)) --right;
+            if (left >= right) break;
+            swap(*left, *right);
+            ++left;
+            --right;
+        }
+        swap(*left, *(last - 1));
+
         if (std::distance(first, left) < std::distance(left + 1, last)) {
             sort(first, left, comp);
             first = left + 1;
@@ -65,51 +100,59 @@ void sort(T* first, T* last, Compare comp) {
         }
     }
 
-    // Завершение сортировки вставками на небольших интервалах
     insertionSort(first, last, comp);
 }
+
+int a[50000];
+int b[50000];
 
 int main(int argc, char* argv)
 {
     srand(time(0));
-
-    const int N = 1000;
-
-    int a[N];
-    int b[N];
-    // Заполнение массива случайными значениями для примера
-    for (int i = 0; i < N; ++i) {
-        a[i] = rand() % 10000;
-        b[i] = rand() % 10000;
-    }
 
     //for (int i = 0; i < 100; ++i) {
     //    std::cout << a[i] << " ";
     //}
     //std::cout << "\n";
 
-    std::ofstream fout1("pyperf_qtest.json");
+    std::ofstream fout1("quicksort.json");
+    std::ofstream fout2("insertsort.json");
 
-    ankerl::nanobench::Bench()
-        .minEpochIterations(10000)
-        .run("qsort", 
-            [&]() {
-                sort(a, a + N, [](int a, int b) { return a < b; });
-            })
-        .render(ankerl::nanobench::templates::pyperf(), fout1);
+    const int benchIterations[] = {2, 4, 8, 16, 32, 64, 128, 256, 1000, 1500, 2500, 5000, 10000, 50000};
+    int j = 0;
+    for each (const int iterations in benchIterations) {
+    
+        for (int i = 0; i < iterations; ++i) {
+            a[i] = rand() % 1000;
+            b[i] = rand() % 1000;
+        }
 
-    std::cout << "\n";
-    std::ofstream fout2("pyperf_itest.json");
+        std::string sortname1 = "qsort" + std::to_string(j);
+        std::string sortname2 = "isort" + std::to_string(j);
 
-    ankerl::nanobench::Bench()
-        .minEpochIterations(10000)
-        .run("isort",
-            [&]() {
-                insertionSort(b, b + N, [](int a, int b) { return a < b; });
-            })
-        .render(ankerl::nanobench::templates::pyperf(), fout2);
+        std::ofstream fout1(sortname1 + ".json");
+        std::ofstream fout2(sortname2 + ".json");
 
-     //Вывод отсортированного массива
+        ankerl::nanobench::Bench()
+            .epochIterations(1000)
+            .run("simple qsort, size: " + std::to_string(iterations),
+                [&]() {
+                    quickSort(a, a + iterations, [](int a, int b) { return a < b; });
+                })
+            .render(ankerl::nanobench::templates::pyperf(), fout1);
+
+        ankerl::nanobench::Bench()
+            .epochIterations(1000)
+            .run("insertion sort, size: " + std::to_string(iterations),
+                [&]() {
+                    insertionSort(b, b + iterations, [](int a, int b) { return a < b; });
+                })
+            .render(ankerl::nanobench::templates::pyperf(), fout2);
+
+        std::cout << "\n";
+        ++j;
+    }
+
     //for (int i = 0; i < 100; ++i) {
     //    std::cout << b[i] << " ";
     //}
